@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { areaOf, pathTo, type NavNode } from '../logic/tree.ts';
 
 // Light or dark follows the device. Server rendering has no window: then light, no motion reduction.
-function useMedia(query: string): boolean {
+export function useMedia(query: string): boolean {
   const [match, setMatch] = useState(
     () => (typeof window !== 'undefined' && window.matchMedia?.(query).matches) || false,
   );

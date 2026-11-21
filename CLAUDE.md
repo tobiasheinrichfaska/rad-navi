@@ -51,6 +51,7 @@ Public entry: `src/index.ts`.
 | `manual_tests/` | Human-tester instructions (README only so far) |
 | `src/index.ts` | Public entry: components, hooks, types, logic |
 | `src/logic/tree.ts` | `NavNode`, `PageTable`, `areaNode`, `distributor`, `pagesIn`, `nodesWithPage`, `pathTo`, `areaOf` — the tree is an input |
+| `src/logic/scroll.ts` | Mouse wheel → pages: `wheelSteps` (notch = one page, touchpad deltas add up), `turnAngle` (direction by the pointer's side, dead zone on the middle line) |
 | `src/logic/ring.ts`, `wheel.ts`, `gears.ts`, `picker.ts` | Layout of areas/pages on the wheels, geometry (arcs, settle, throw), gear train (ratio −1), choice wheel |
 | `src/ui/WheelNav.tsx`, `props.ts` | The navigation component and its props/texts (`WheelNavProps`, `WheelTexts`, `DEFAULT_TEXTS`) |
 | `src/ui/Ring.tsx`, `MiniWheel.tsx`, `GearTrain.tsx`, `Frame.tsx` | Wheel pieces, the small wheel on a page, gears, full-screen frame |
@@ -82,6 +83,12 @@ npm run format:check
   swipe to the neighbour page, back gesture, dark mode/reduced motion, no tap box in Safari,
   safe-area insets); the tests cover geometry, the first render and source guards. Each consuming
   app repeats the manual navigation tests on a device.
+- **Mouse wheel (2026-11-21):** on the wheel view the scroll wheel turns the wheel (or visible
+  background gear) under the pointer like a touch would, a roller laid on from above: scrolling down
+  on a wheel's right half turns it anticlockwise, on the left half clockwise; nothing within 6 px of
+  the vertical middle line. One notch = one page of that wheel (gears at their ratio, settling on a
+  page). Only if a mouse exists (`(any-hover: hover) and (any-pointer: fine)`; a touchpad counts
+  too). Outside wheels/gears and on open pages the wheel scrolls as before. Hand-test only.
 - **Not consumed by any app yet**; not published to npm; no Git tag. Apps would take it by Git tag.
 - Dropped from the original: the practice run, the hint line, the close button and the built-in test
   page; its "Test" hub is now the optional `extraAction`. `data-*` attributes were renamed

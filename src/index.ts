@@ -37,6 +37,7 @@ export {
   keyboardFocus,
   surfaces,
   useDark,
+  useMedia,
   useReducedMotion,
   type GearColors,
   type Surfaces,
@@ -113,6 +114,9 @@ export {
   type GearTrain,
   type Point,
 } from './logic/gears.ts';
+
+// Logic: mouse wheel
+export { DEAD_ZONE, PIXELS_PER_PAGE, turnAngle, wheelSteps } from './logic/scroll.ts';
 
 // Logic: choice wheel
 export { topIndex, turnFor } from './logic/picker.ts';

@@ -21,12 +21,14 @@ import {
   pageAtPointer,
   pageUnder,
   pageWidth,
+  positionForTurn,
   pageWedge,
   toGroup,
   neighbour,
   swipe,
   type Placement,
 } from '../logic/ring.ts';
+import { turnAngle, wheelSteps } from '../logic/scroll.ts';
 import type { NavNode } from '../logic/tree.ts';
 import {
   NO_BOX,
@@ -34,11 +36,12 @@ import {
   surfaces,
   gearColors,
   useDark,
+  useMedia,
   useReducedMotion,
   type Surfaces,
 } from './colors.ts';
 import { HubGears, GearsBehind } from './GearTrain.tsx';
-import { useGrip, usePosition, useRingPath, useProgress } from './position.ts';
+import { useGrip, usePosition, useRingPath, useProgress, type GripWheel } from './position.ts';
 import { MiniWheel } from './MiniWheel.tsx';
 import { DEFAULT_TEXTS, type WheelNavProps } from './props.ts';
 import { Ring, RingGhost, type RingPiece } from './Ring.tsx';
@@ -78,6 +81,8 @@ export function WheelNav({
   const texts = useMemo(() => ({ ...DEFAULT_TEXTS, ...textOverrides }), [textOverrides]);
   const reducedMotion = useReducedMotion();
   const dark = useDark();
+  // a mouse is there (a touch-only device has none): its wheel may turn the wheels
+  const hasMouse = useMedia('(any-hover: hover) and (any-pointer: fine)');
   const f = surfaces(dark);
   const gears = gearColors(dark, f.ground);
   // The page the app was on, so a restarted app opens there.
@@ -175,55 +180,88 @@ export function WheelNav({
   const oneLevel = () => back(path.length - 2);
   useBackGesture(openNode, oneLevel);
 
-  const grip = useGrip(
-    layout,
-    position,
-    (x, y) => {
-      // Gears behind, where neither wheel covers them, turn too.
-      const free = Math.hypot(x - cx, y - bottomY) > rBottom && Math.hypot(x - cx, y - topY) > rTop;
-      const behind = free ? backgroundGearAt(train, x, y) : undefined;
-      if (behind) {
-        const w = pageWidth(layout);
-        return {
-          cx: behind.x,
-          cy: behind.y,
-          placement: TOP,
-          // its turn → the lower hub gear's turn (−t·w) → t
-          dt: (angle: number) => -angle / (ratioOf(behind.name) * w),
+  const wheelAt = (x: number, y: number): GripWheel | undefined => {
+    // Gears behind, where neither wheel covers them, turn too.
+    const free = Math.hypot(x - cx, y - bottomY) > rBottom && Math.hypot(x - cx, y - topY) > rTop;
+    const behind = free ? backgroundGearAt(train, x, y) : undefined;
+    if (behind) {
+      const w = pageWidth(layout);
+      return {
+        cx: behind.x,
+        cy: behind.y,
+        placement: TOP,
+        // its turn → the lower hub gear's turn (−t·w) → t
+        dt: (angle: number) => -angle / (ratioOf(behind.name) * w),
+        snap: snapToPage,
+        tap: () => undefined,
+      };
+    }
+    return y < contact
+      ? {
+          cx,
+          cy: topY,
+          placement: PAGE_WHEEL,
           snap: snapToPage,
-          tap: () => undefined,
+          tap: (angle: number, distance: number) => {
+            if (distance < topHubR && withJump && extraAction) runExtra();
+            else if (distance >= innerTop && distance <= rTop) {
+              openPage(pageUnder(layout, angle, position.now.current, PAGE_WHEEL));
+            }
+          },
+        }
+      : {
+          cx,
+          cy: bottomY,
+          placement: TOP,
+          // Both wheels settle on every page of the upper one, not only on the areas' middles.
+          snap: snapToPage,
+          tap: (angle: number, distance: number) => {
+            if (distance < innerBottom) tapLowerHub();
+            else if (distance <= rBottom) {
+              const i = groupUnder(layout, angle, position.now.current);
+              position.glide(snapToPage(toGroup(layout, i, position.now.current)));
+            }
+          },
         };
-      }
-      return y < contact
-        ? {
-            cx,
-            cy: topY,
-            placement: PAGE_WHEEL,
-            snap: snapToPage,
-            tap: (angle: number, distance: number) => {
-              if (distance < topHubR && withJump && extraAction) runExtra();
-              else if (distance >= innerTop && distance <= rTop) {
-                openPage(pageUnder(layout, angle, position.now.current, PAGE_WHEEL));
-              }
-            },
-          }
-        : {
-            cx,
-            cy: bottomY,
-            placement: TOP,
-            // Both wheels settle on every page of the upper one, not only on the areas' middles.
-            snap: snapToPage,
-            tap: (angle: number, distance: number) => {
-              if (distance < innerBottom) tapLowerHub();
-              else if (distance <= rBottom) {
-                const i = groupUnder(layout, angle, position.now.current);
-                position.glide(snapToPage(toGroup(layout, i, position.now.current)));
-              }
-            },
-          };
-    },
-    !!transition,
-  );
+  };
+
+  const grip = useGrip(layout, position, wheelAt, !!transition);
+
+  // The mouse wheel turns the wheel under the pointer (or a gear), as a roller laid on from above:
+  // scrolling down on a wheel's right half turns it anticlockwise. Not on the vertical middle line.
+  const wheelState = useRef({ rest: 0, target: 0, at: 0 });
+  const onMouseWheel = useRef<(e: WheelEvent) => void>(() => undefined);
+  onMouseWheel.current = (e) => {
+    const el = area.current;
+    if (!el || transition) return;
+    const box = el.getBoundingClientRect();
+    const wheel = wheelAt(e.clientX - box.left, e.clientY - box.top);
+    if (!wheel) return;
+    e.preventDefault();
+    const w = wheelState.current;
+    const turn = wheelSteps(e.timeStamp - w.at > 400 ? 0 : w.rest, e.deltaY, e.deltaMode);
+    w.rest = turn.rest;
+    const angle = turnAngle(turn.steps, e.clientX - box.left - wheel.cx, pageWidth(layout));
+    if (angle === 0) return;
+    // notches in quick succession add up to the place already on its way
+    const quick = e.timeStamp - w.at < 250;
+    const base = quick ? w.target : position.now.current;
+    const moved =
+      base + (wheel.dt ? wheel.dt(angle) : positionForTurn(layout, angle, wheel.placement));
+    let target = wheel.snap(moved);
+    if (target === wheel.snap(base)) target = wheel.snap(base) + Math.sign(moved - base);
+    w.target = target;
+    w.at = e.timeStamp;
+    position.glide(target, 140);
+  };
+  useEffect(() => {
+    const el = area.current;
+    if (!el || !hasMouse) return;
+    const handler = (e: WheelEvent) => onMouseWheel.current(e);
+    // not passive: the page behind must not scroll along
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [hasMouse, here.type]);
 
   if (here.type === 'page') {
     const level = path[ringIndex]?.node ?? tree;
