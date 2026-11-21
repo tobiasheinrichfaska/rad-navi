@@ -1,6 +1,6 @@
 {
   "name": "rad-navi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Wheel navigation (two coupled friction wheels): UI-free geometry and logic",
   "type": "module",
   "license": "AGPL-3.0-only",
