@@ -1,0 +1,53 @@
+# rad-navi
+
+Wheel navigation („Reibräder“) for React web apps: two coupled wheels (areas below, pages above),
+swipe to the neighbouring page, back gesture goes one level back, remembers the last page. The tree of
+areas and pages, the page contents, start/jump targets and all texts come from your app; the package
+holds no app data.
+
+**Status:** early (0.1.0), not published to npm. Web only (SVG/DOM), not for React Native builds.
+
+## Install and test
+
+```bash
+npm install
+npm test
+npm run typecheck
+```
+
+## Usage
+
+```tsx
+import { WheelNav, areaNode, distributor } from 'rad-navi';
+
+const pages = { today: { name: 'Today' }, list: { name: 'List' } };
+const tree = distributor('root', 'Root', [areaNode(pages, 'home', 'Home', ['today', 'list'])]);
+
+<WheelNav
+  tree={tree}
+  pages={pages}
+  pageFor={(page) => <MyPage id={page} />}
+  onOpenChange={(node) => remember(node)}
+/>;
+```
+
+All props and texts: `src/ui/props.ts`. Names of the original German API and their English
+equivalents: [docs/api-mapping.md](docs/api-mapping.md). Gestures and look can only be checked on a
+device: see `manual_tests/`.
+
+Bug reports and ideas: [GitHub Issues](https://github.com/tobiasheinrichfaska/rad-navi/issues).
+
+## License
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
+This project is licensed under the **GNU Affero General Public License v3.0** (AGPLv3).
+You are free to use, modify, and distribute this software under the terms of the AGPLv3.
+If you use this software to provide a network service, you must make the full source code
+of your modifications available to users of that service.
+
+**Commercial License:** If you wish to use this software in a closed-source or proprietary
+product, a commercial license is available. Contact: tobias.a.w.heinrich@gmail.com
+
+See [LICENSE](LICENSE) for the full AGPLv3 text.
+See [LICENSE_COMMERCIAL.md](LICENSE_COMMERCIAL.md) for commercial licensing terms.
