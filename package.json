@@ -9,7 +9,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build": "tsc -p tsconfig.build.json && node scripts/fix-declarations.mjs",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "react": "^19.2.6",
@@ -17,12 +19,24 @@
   },
   "devDependencies": {
     "@types/node": "^24",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "prettier": "^3.9.10",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.12",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0"
-  }
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": "false",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ]
 }
