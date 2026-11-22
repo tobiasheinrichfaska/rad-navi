@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useBackGesture } from './useBackGesture.ts';
-import { backgroundGearAt, ratioOf, gearTrain } from '../logic/gears.ts';
+import { ratioOf, gearTrain, tipRadius } from '../logic/gears.ts';
 import { unfold, smooth } from '../logic/wheel.ts';
 import {
   TOP,
@@ -31,6 +31,16 @@ import {
 import { turnAngle, wheelSteps } from '../logic/scroll.ts';
 import type { NavNode } from '../logic/tree.ts';
 import {
+  assign,
+  clear,
+  fitLabel,
+  hubTapAction,
+  resolveShortcut,
+  serializeShortcuts,
+  type HubShortcuts,
+} from '../logic/shortcuts.ts';
+import { dropTarget, zoneAt, type Hub, type Zone, type ZoneGeometry } from '../logic/zones.ts';
+import {
   NO_BOX,
   colorOf,
   surfaces,
@@ -40,7 +50,9 @@ import {
   useReducedMotion,
   type Surfaces,
 } from './colors.ts';
-import { HubGears, GearsBehind } from './GearTrain.tsx';
+import { HubGears, GearsBehind, HubCopy, FADED } from './GearTrain.tsx';
+import { useHubGrab } from './useHubGrab.ts';
+import { useShortcuts } from './useShortcuts.ts';
 import { useGrip, usePosition, useRingPath, useProgress, type GripWheel } from './position.ts';
 import { MiniWheel } from './MiniWheel.tsx';
 import { DEFAULT_TEXTS, type WheelNavProps } from './props.ts';
@@ -51,6 +63,8 @@ const OPEN_MS = 260;
 /** The chosen area's outline on the lower wheel — off for a try. */
 const AREA_OUTLINED = false;
 const CLOSE_MS = 280;
+/** How long a hub gear stays lit after a tap gave it a shortcut. */
+const FLASH_MS = 500;
 /** The page wheel touches the area wheel with its bottom and turns the other way. */
 const PAGE_WHEEL: Placement = { offset: Math.PI, direction: -1 };
 
@@ -76,6 +90,9 @@ export function WheelNav({
   status,
   extraAction,
   ownGestureSelector,
+  shortcuts: initialShortcuts,
+  onShortcutsChange,
+  shortcutsStorageKey,
   texts: textOverrides,
 }: WheelNavProps) {
   const texts = useMemo(() => ({ ...DEFAULT_TEXTS, ...textOverrides }), [textOverrides]);
@@ -149,6 +166,27 @@ export function WheelNav({
   const t = position.t;
   const pageNow = pageAtPointer(layout, t);
   const areaNow = layout.pages[pageNow]?.group ?? 0;
+  // What each hub points to: the app's value or what was stored, changed by dropping a copy.
+  const {
+    shortcuts,
+    current: shortcutsNow,
+    set: setShortcuts,
+  } = useShortcuts(initialShortcuts, shortcutsStorageKey, onShortcutsChange);
+  // The hub that was just given a shortcut by a tap: lit for a moment (not with reduced motion).
+  const [flash, setFlash] = useState<Hub | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const id = window.setTimeout(() => setFlash(null), FLASH_MS);
+    return () => window.clearTimeout(id);
+  }, [flash]);
+  const commitShortcuts = (next: HubShortcuts) => {
+    if (serializeShortcuts(next) !== serializeShortcuts(shortcutsNow.current)) setShortcuts(next);
+  };
+  const nameOf = (node: NavNode) => (node.page ? pages?.[node.page]?.name : undefined) ?? node.name;
+  const shortcutNode = (hub: Hub) => {
+    const k = resolveShortcut(layout, shortcuts[hub]);
+    return k === undefined ? undefined : layout.pages[k]?.node;
+  };
 
   const openPage = (k: number) => {
     if (transition || !layout.pages[k]) return;
@@ -180,52 +218,107 @@ export function WheelNav({
   const oneLevel = () => back(path.length - 2);
   useBackGesture(openNode, oneLevel);
 
-  const wheelAt = (x: number, y: number): GripWheel | undefined => {
-    // Gears behind, where neither wheel covers them, turn too.
-    const free = Math.hypot(x - cx, y - bottomY) > rBottom && Math.hypot(x - cx, y - topY) > rTop;
-    const behind = free ? backgroundGearAt(train, x, y) : undefined;
-    if (behind) {
+  // Every point is in exactly one zone (hub, turn, piece, none), see `zoneAt`.
+  const geometry: ZoneGeometry = {
+    train,
+    cx,
+    contact,
+    topY,
+    bottomY,
+    rTop,
+    rBottom,
+    innerTop,
+    innerBottom,
+    width: size.w,
+    height: size.h,
+  };
+  const zoneOf = (x: number, y: number) => zoneAt(geometry, x, y);
+  /** The wheel (or gear behind) a zone turns; a piece of a ring also has its tap. */
+  const wheelFor = (z: Zone): GripWheel | undefined => {
+    if (z.zone === 'none') return undefined;
+    const kind = z.zone === 'piece' ? 'piece' : 'turn';
+    const which = z.zone === 'hub' ? z.hub : z.wheel;
+    if (which === 'behind') {
+      const behind = train.gears.find((g) => g.name === (z.zone === 'turn' ? z.gear : undefined));
+      if (!behind) return undefined;
       const w = pageWidth(layout);
       return {
         cx: behind.x,
         cy: behind.y,
         placement: TOP,
+        zone: 'turn',
         // its turn → the lower hub gear's turn (−t·w) → t
         dt: (angle: number) => -angle / (ratioOf(behind.name) * w),
         snap: snapToPage,
         tap: () => undefined,
       };
     }
-    return y < contact
+    return which === 'top'
       ? {
           cx,
           cy: topY,
           placement: PAGE_WHEEL,
+          zone: kind,
           snap: snapToPage,
-          tap: (angle: number, distance: number) => {
-            if (distance < topHubR && withJump && extraAction) runExtra();
-            else if (distance >= innerTop && distance <= rTop) {
+          tap: (angle: number) => {
+            if (kind === 'piece')
               openPage(pageUnder(layout, angle, position.now.current, PAGE_WHEEL));
-            }
           },
         }
       : {
           cx,
           cy: bottomY,
           placement: TOP,
+          zone: kind,
           // Both wheels settle on every page of the upper one, not only on the areas' middles.
           snap: snapToPage,
-          tap: (angle: number, distance: number) => {
-            if (distance < innerBottom) tapLowerHub();
-            else if (distance <= rBottom) {
-              const i = groupUnder(layout, angle, position.now.current);
-              position.glide(snapToPage(toGroup(layout, i, position.now.current)));
-            }
+          tap: (angle: number) => {
+            if (kind !== 'piece') return;
+            const i = groupUnder(layout, angle, position.now.current);
+            position.glide(snapToPage(toGroup(layout, i, position.now.current)));
           },
         };
   };
+  // A hub never turns by hand (its drag grabs the gear): the grip takes the other zones only.
+  const wheelAt = (x: number, y: number): GripWheel | undefined => {
+    const z = zoneOf(x, y);
+    return z.zone === 'hub' ? undefined : wheelFor(z);
+  };
 
   const grip = useGrip(layout, position, wheelAt, !!transition);
+
+  const pageHere = () => layout.pages[pageAtPointer(layout, position.now.current)]?.node;
+  /** Makes the page at the contact the hub's shortcut; false when there is none. */
+  const assignHere = (hub: Hub): boolean => {
+    const node = pageHere();
+    if (!node) return false;
+    commitShortcuts(assign(shortcutsNow.current, hub, node.id));
+    return true;
+  };
+  // A tap on a hub, see `hubTapAction`: its shortcut; else what the hub always did; with neither,
+  // the page at the contact becomes its shortcut (lit for a moment).
+  const tapHub = (hub: Hub) => {
+    const k = resolveShortcut(layout, shortcutsNow.current[hub]);
+    const oldAction =
+      hub === 'bottom' ? !!jumpTarget?.() || !!extraAction : withJump && !!extraAction;
+    const what = hubTapAction(k !== undefined, oldAction);
+    if (what === 'shortcut') {
+      if (k !== undefined) openPage(k);
+    } else if (what === 'old') {
+      if (hub === 'bottom') tapLowerHub();
+      else runExtra();
+    } else if (!transition && assignHere(hub) && !reducedMotion) setFlash(hub);
+  };
+  const hubs = useHubGrab({
+    zoneOf,
+    locked: () => !!transition || grip.busy(),
+    onTap: tapHub,
+    onDrop: (hub, x, y) => {
+      const target = dropTarget(train, hub, x, y);
+      if (target === 'delete') commitShortcuts(clear(shortcutsNow.current, hub));
+      else if (target) assignHere(hub);
+    },
+  });
 
   // The mouse wheel turns the wheel under the pointer (or a gear), as a roller laid on from above:
   // scrolling down on a wheel's right half turns it anticlockwise. Not on the vertical middle line.
@@ -233,9 +326,10 @@ export function WheelNav({
   const onMouseWheel = useRef<(e: WheelEvent) => void>(() => undefined);
   onMouseWheel.current = (e) => {
     const el = area.current;
-    if (!el || transition) return;
+    if (!el || transition || hubs.held()) return;
     const box = el.getBoundingClientRect();
-    const wheel = wheelAt(e.clientX - box.left, e.clientY - box.top);
+    // over a hub the roller still turns its wheel (a hub only reacts to tap and drag)
+    const wheel = wheelFor(zoneOf(e.clientX - box.left, e.clientY - box.top));
     if (!wheel) return;
     e.preventDefault();
     const w = wheelState.current;
@@ -368,11 +462,172 @@ export function WheelNav({
     };
   })();
   const targetNode = targetId ? layout.pages.find((s) => s.node.id === targetId)?.node : undefined;
-  const targetName = targetNode
-    ? ((targetNode.page ? pages?.[targetNode.page]?.name : undefined) ?? targetNode.name)
+  const targetName = targetNode ? nameOf(targetNode) : undefined;
+  const lowerDiscR = Math.max(16, rBottom * 0.14);
+  const hubDiscR = (hub: Hub) => (hub === 'bottom' ? lowerDiscR : topHubR);
+  // What a hub shows and says: its shortcut, else what it did before shortcuts; with neither, it
+  // says what a tap does now (assign the page at the contact). Every hub has an action, so every
+  // hub is a button for the keyboard and screen readers.
+  const hubLook = (hub: Hub) => {
+    const node = shortcutNode(hub);
+    if (node) {
+      const name = nameOf(node);
+      return { label: name, aria: texts.shortcutFor(name), fitted: true };
+    }
+    const here = pageHere();
+    const assignAria = here ? texts.shortcutAssign(nameOf(here)) : texts.shortcutEmpty;
+    if (hub === 'bottom') {
+      const old = !!targetId || !!extraAction;
+      const aria = targetId ? texts.jumpToTarget : extraAction?.label;
+      return {
+        label: targetName ?? extraAction?.label,
+        aria: old ? aria || texts.shortcutEmpty : assignAria,
+        fitted: false,
+      };
+    }
+    const label = withJump ? extraAction?.label : undefined;
+    return {
+      label,
+      aria: label || (withJump && extraAction ? texts.shortcutEmpty : assignAria),
+      fitted: false,
+    };
+  };
+  const dragging = hubs.drag;
+  const dragTarget = dragging ? dropTarget(train, dragging.hub, dragging.x, dragging.y) : undefined;
+  const gearOf = (name: string) => train.gears.find((g) => g.name === name);
+  const hubKeys = (hub: Hub) => (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      assignHere(hub);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      tapHub(hub);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      commitShortcuts(clear(shortcutsNow.current, hub));
+    }
+  };
+  /** One hub: a round label over the gear, a button for screen readers and the keyboard. */
+  const hubButton = (hub: Hub) => {
+    const look = hubLook(hub);
+    const gear = gearOf(hub);
+    if (!gear) return null;
+    const r = hubDiscR(hub);
+    const base = hub === 'bottom' ? Math.max(12, rBottom * 0.09) : Math.max(12, topHubR * 0.6);
+    const fit = look.fitted && look.label ? fitLabel(look.label, r * 1.7, base) : undefined;
+    const shown = look.label !== undefined;
+    return (
+      <g
+        key={hub}
+        role="button"
+        tabIndex={0}
+        aria-label={look.aria}
+        onKeyDown={hubKeys(hub)}
+        onClick={(e) => {
+          if (e.detail === 0) tapHub(hub);
+        }}
+        data-hub={hub}
+        style={NO_BOX}
+        opacity={cover * (dragging?.hub === hub ? FADED : 1)}
+      >
+        {(hub === 'bottom' || shown) && (
+          <circle cx={gear.x} cy={gear.y} r={r} fill={f.ground} opacity={0.9} />
+        )}
+        {shown && (
+          <text
+            x={gear.x}
+            y={gear.y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill={f.text}
+            fontSize={fit?.size ?? base}
+            fontWeight={700}
+            style={{ pointerEvents: 'none' }}
+          >
+            {fit?.text ?? look.label}
+          </text>
+        )}
+      </g>
+    );
+  };
+  // While a gear is carried: the gear it is over lights up, the idler waits to delete. The tint
+  // lies under the carried copy, the outline and the mark (the idler is covered by the rings and
+  // may be smaller than the copy) on top of everything.
+  const highlight = (
+    name: string,
+    strong: boolean,
+    color: string,
+    layer: 'tint' | 'mark',
+    x?: string,
+  ) => {
+    const gear = gearOf(name);
+    if (!gear) return null;
+    const tip = tipRadius(gear, train.module);
+    return (
+      <g
+        key={`${name}-${layer}`}
+        data-drop={name}
+        data-lit={strong ? '' : undefined}
+        style={{ pointerEvents: 'none' }}
+      >
+        {layer === 'tint' ? (
+          <circle cx={gear.x} cy={gear.y} r={tip} fill={color} fillOpacity={strong ? 0.28 : 0.08} />
+        ) : (
+          <>
+            <circle
+              cx={gear.x}
+              cy={gear.y}
+              r={tip}
+              fill="none"
+              stroke={color}
+              strokeWidth={strong ? 4 : 2}
+              strokeDasharray={strong ? undefined : '6 5'}
+              opacity={strong ? 1 : 0.6}
+            />
+            {x && (
+              <text
+                x={gear.x}
+                y={gear.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill={color}
+                fontSize={strong ? 64 : 48}
+                fontWeight={700}
+                opacity={strong ? 1 : 0.5}
+                stroke={strong ? f.ground : undefined}
+                strokeWidth={strong ? 3 : undefined}
+                paintOrder="stroke"
+              >
+                {x}
+              </text>
+            )}
+            {x && strong && (
+              <text
+                x={gear.x}
+                y={gear.y + 46}
+                textAnchor="middle"
+                fill={color}
+                fontSize={13}
+                fontWeight={700}
+                stroke={f.ground}
+                strokeWidth={3}
+                paintOrder="stroke"
+              >
+                {texts.shortcutDelete}
+              </text>
+            )}
+          </>
+        )}
+      </g>
+    );
+  };
+  const otherHub: Hub | undefined = dragging
+    ? dragging.hub === 'bottom'
+      ? 'top'
+      : 'bottom'
     : undefined;
-  const lowerLabel = targetName ?? extraAction?.label;
-  const lowerAria = targetId ? texts.jumpToTarget : extraAction?.label;
+  const copyGear = dragging ? gearOf(dragging.hub) : undefined;
+  const copyNode = dragging ? pageHere() : undefined;
 
   return (
     <Frame path={path.map((s) => s.node)} onJump={back} status={status} texts={texts}>
@@ -394,7 +649,21 @@ export function WheelNav({
           data-bottom-r={rBottom}
           data-top-y={topY}
           data-top-r={rTop}
-          {...grip}
+          data-hub-bottom-r={lowerDiscR}
+          data-hub-top-r={topHubR}
+          onPointerDown={(e) => {
+            if (!hubs.onPointerDown(e)) grip.onPointerDown(e);
+          }}
+          onPointerMove={(e) => {
+            if (!hubs.onPointerMove(e)) grip.onPointerMove(e);
+          }}
+          onPointerUp={(e) => {
+            if (!hubs.onPointerUp(e)) grip.onPointerUp(e);
+          }}
+          onPointerCancel={(e) => {
+            if (!hubs.onPointerCancel(e)) grip.onPointerCancel();
+          }}
+          onLostPointerCapture={(e) => hubs.onLostPointerCapture(e)}
         >
           {/* the works behind the wheels, seen through the rings */}
           <GearsBehind
@@ -426,81 +695,17 @@ export function WheelNav({
             surfaces={f}
           />
           {/* the hub gears, different in size; the train between them makes the ratio right */}
-          <HubGears train={train} bottom={-t * pageWidth(layout)} colors={gears} opacity={cover} />
-          {/* the upper middle: the extra action, when the lower one jumps */}
-          {withJump && extraAction && (
-            <g
-              role="button"
-              tabIndex={0}
-              aria-label={extraAction.label}
-              style={NO_BOX}
-              opacity={cover}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  runExtra();
-                }
-              }}
-              onClick={(e) => {
-                if (e.detail === 0) runExtra();
-              }}
-            >
-              <circle cx={cx} cy={topY} r={topHubR} fill={f.ground} opacity={0.9} />
-              <text
-                x={cx}
-                y={topY}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={f.text}
-                fontSize={Math.max(12, topHubR * 0.6)}
-                fontWeight={700}
-                style={{ pointerEvents: 'none' }}
-              >
-                {extraAction.label}
-              </text>
-            </g>
-          )}
-          {/* the lower middle: the jump target (without one: the extra action, if any) */}
-          <g
-            {...(lowerAria
-              ? {
-                  role: 'button',
-                  tabIndex: 0,
-                  'aria-label': lowerAria,
-                  onKeyDown: (e: KeyboardEvent) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      tapLowerHub();
-                    }
-                  },
-                  onClick: (e: { detail: number }) => {
-                    if (e.detail === 0) tapLowerHub();
-                  },
-                }
-              : {})}
-            style={NO_BOX}
+          <HubGears
+            train={train}
+            bottom={-t * pageWidth(layout)}
+            colors={gears}
             opacity={cover}
-          >
-            <circle
-              cx={cx}
-              cy={bottomY}
-              r={Math.max(16, rBottom * 0.14)}
-              fill={f.ground}
-              opacity={0.9}
-            />
-            <text
-              x={cx}
-              y={bottomY}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill={f.text}
-              fontSize={Math.max(12, rBottom * 0.09)}
-              fontWeight={700}
-              style={{ pointerEvents: 'none' }}
-            >
-              {lowerLabel}
-            </text>
-          </g>
+            faded={dragging?.hub ?? undefined}
+          />
+          {/* the hubs: the upper middle (shortcut, or the extra action when the lower one jumps) and the
+              lower middle (shortcut, or the jump target, or without one the extra action) */}
+          {hubButton('top')}
+          {hubButton('bottom')}
           {/* where the wheels touch: the page there and its area are the chosen ones */}
           <path
             d={`M${cx - 10} ${contact}h20M${cx} ${contact - 10}v20`}
@@ -509,6 +714,9 @@ export function WheelNav({
             opacity={transition ? 0 : 0.5}
             style={{ pointerEvents: 'none' }}
           />
+          {dragging && otherHub && highlight(otherHub, dragTarget === otherHub, '#2563c9', 'tint')}
+          {dragging && highlight('idler', dragTarget === 'delete', '#d1242f', 'tint')}
+          {flash && highlight(flash, true, '#2563c9', 'tint')}
           {ghost && (
             <RingGhost
               wedge={ghost.wedge}
@@ -520,6 +728,23 @@ export function WheelNav({
               opacity={1}
             />
           )}
+          {/* the carried copy of a hub gear: on top of everything */}
+          {dragging && copyGear && (
+            <HubCopy
+              gear={copyGear}
+              module={train.module}
+              x={dragging.x}
+              y={dragging.y}
+              colors={gears}
+              name={copyNode ? nameOf(copyNode) : ''}
+              ground={f.ground}
+              text={f.text}
+              hubRadius={hubDiscR(dragging.hub)}
+            />
+          )}
+          {dragging && otherHub && highlight(otherHub, dragTarget === otherHub, '#2563c9', 'mark')}
+          {dragging && highlight('idler', dragTarget === 'delete', '#d1242f', 'mark', '×')}
+          {flash && highlight(flash, true, '#2563c9', 'mark')}
         </svg>
       </div>
     </Frame>

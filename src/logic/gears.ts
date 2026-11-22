@@ -107,6 +107,16 @@ export function tipRadius(gear: Gear, module: number): number {
   return gear.pitchRadius + module * 0.9;
 }
 
+/** Root radius of a gear (the bottom of its tooth gaps): pitch radius minus 1.1 modules. */
+export function rootRadius(gear: Gear, module: number): number {
+  return gear.pitchRadius - module * 1.1;
+}
+
+/** Radius of the ring drawn inside a gear (its spokes' ring): 62 % of the root radius. */
+export function ringRadius(gear: Gear, module: number): number {
+  return rootRadius(gear, module) * 0.62;
+}
+
 /** How far a gear turns when the lower hub gear turns by 1 (the sign: its direction). */
 export function ratioOf(name: GearName): number {
   const z = TOOTH_COUNTS;
