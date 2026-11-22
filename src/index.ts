@@ -141,6 +141,7 @@ export {
   cleanShortcuts,
   clear,
   fitLabel,
+  hubTapAction,
   isEmpty,
   loadShortcuts,
   parseShortcuts,
@@ -148,6 +149,7 @@ export {
   saveShortcuts,
   serializeShortcuts,
   type HubShortcuts,
+  type HubTapAction,
   type StorageLike,
 } from './logic/shortcuts.ts';
 

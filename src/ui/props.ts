@@ -24,7 +24,9 @@ export interface WheelTexts {
   readonly backButton: (name: string) => string;
   /** Label of a hub that holds a shortcut to the page `name`. */
   readonly shortcutFor: (name: string) => string;
-  /** Fallback label of a hub that is a button (it has an old action) but whose action has no label. */
+  /** Label of a hub with nothing to do yet: a tap makes the page at the contact its shortcut. */
+  readonly shortcutAssign: (name: string) => string;
+  /** Same without a page name (no page at the contact); also the fallback for an old action without a label. */
   readonly shortcutEmpty: string;
   /** Shown on the idler gear while a hub gear is carried over it: drop to remove the shortcut. */
   readonly shortcutDelete: string;
@@ -41,7 +43,8 @@ export const DEFAULT_TEXTS: WheelTexts = {
   placeholder: (name) => `The page “${name}” will go here.`,
   backButton: (name) => `↩ Back to ${name}`,
   shortcutFor: (name) => `Shortcut to ${name}`,
-  shortcutEmpty: 'Shortcut (not set)',
+  shortcutAssign: (name) => `Set shortcut to ${name}`,
+  shortcutEmpty: 'Set shortcut to the current page',
   shortcutDelete: 'Remove shortcut',
 };
 
@@ -83,7 +86,8 @@ export interface WheelNavProps {
   /**
    * Shortcuts on the two hub gears (node ids), the start value. Drag a hub gear onto the other one to
    * point it to the page at the contact, onto the idler gear to remove it; a tap opens the page.
-   * Without one a hub does what it always did.
+   * Without one a hub does what it always did (jump target, extra action); a hub with neither
+   * takes the page at the contact as its shortcut on a tap.
    */
   readonly shortcuts?: HubShortcuts | undefined;
   /** Called with the new shortcuts on every change (to keep them in the app's own storage). */

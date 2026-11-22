@@ -6,6 +6,7 @@ import {
   cleanShortcuts,
   clear,
   fitLabel,
+  hubTapAction,
   isEmpty,
   loadShortcuts,
   parseShortcuts,
@@ -179,5 +180,18 @@ describe('shortcuts: label fitting', () => {
     expect(cut.text.endsWith('…')).toBe(true);
     expect(cut.size).toBe(8);
     expect(fitLabel('', 40, 14).text).toBe('');
+  });
+});
+
+describe('hubTapAction: the fallback chain of a hub tap', () => {
+  it('a resolvable shortcut wins, even with an old action', () => {
+    expect(hubTapAction(true, false)).toBe('shortcut');
+    expect(hubTapAction(true, true)).toBe('shortcut');
+  });
+  it('without a shortcut the old action runs', () => {
+    expect(hubTapAction(false, true)).toBe('old');
+  });
+  it('with neither, a tap assigns the page at the contact', () => {
+    expect(hubTapAction(false, false)).toBe('assign');
   });
 });

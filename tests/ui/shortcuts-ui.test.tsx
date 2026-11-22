@@ -17,14 +17,17 @@ describe('WheelNav shortcuts: first render', () => {
     html.match(new RegExp(`<g[^>]*data-hub="${hub}"[^>]*>`))?.[0] ?? '';
   const extra = { label: 'Extra', onActivate: () => undefined };
 
-  it('an app without shortcuts or hub actions sees plain hubs: no role, tab stop or label', () => {
+  it('an app without shortcuts or hub actions gets two focusable hubs that offer to assign', () => {
     const html = render();
     for (const hub of ['top', 'bottom']) {
       const tag = hubTag(html, hub);
-      expect(tag).not.toBe('');
-      expect(tag).not.toMatch(/role=|tabindex=|aria-label=/);
+      expect(tag).toMatch(/role="button"/);
+      expect(tag).toMatch(/tabindex="0"/);
+      // says what a tap does, with the page at the contact
+      expect(tag).toMatch(/aria-label="Set shortcut to [^"]+"/);
     }
-    expect(html).not.toContain(DEFAULT_TEXTS.shortcutEmpty);
+    expect(DEFAULT_TEXTS.shortcutAssign('X')).toBe('Set shortcut to X');
+    expect(DEFAULT_TEXTS.shortcutEmpty).toBe('Set shortcut to the current page');
     expect(html).not.toContain('Shortcut to');
     expect(html).not.toContain('data-copy');
     expect(html).not.toContain('data-drop');
@@ -36,28 +39,38 @@ describe('WheelNav shortcuts: first render', () => {
     expect(html).toContain('aria-label="Shortcut to Page 5.0"');
     expect(html).toContain('>Page 3.1<');
     expect(html).toContain('>Page 5.0<');
-    expect(html).not.toContain(`aria-label="${DEFAULT_TEXTS.shortcutEmpty}"`);
+    expect(html).not.toContain('Set shortcut to');
   });
 
-  it('a hub is a button only when it has something to do', () => {
+  it('every hub is a button; its label says what a tap does', () => {
     const isButton = (html: string, hub: string) =>
       /role="button"/.test(hubTag(html, hub)) && /tabindex="0"/.test(hubTag(html, hub));
-    // extra action alone: only the lower hub (the upper one needs the jump target as well)
+    const aria = (html: string, hub: string) =>
+      /aria-label="([^"]*)"/.exec(hubTag(html, hub))?.[1] ?? '';
+    // extra action alone: the lower hub runs it, the upper one (no jump target) assigns
     const onlyExtra = render({ extraAction: extra });
-    expect(isButton(onlyExtra, 'bottom')).toBe(true);
-    expect(isButton(onlyExtra, 'top')).toBe(false);
-    // jump target and extra action: both, as before shortcuts
+    expect(aria(onlyExtra, 'bottom')).toBe('Extra');
+    expect(aria(onlyExtra, 'top')).toMatch(/^Set shortcut to /);
+    // jump target and extra action: both keep their old labels
     const both = render({ jumpTarget: () => 'a2/a2p0', extraAction: extra });
-    expect(isButton(both, 'bottom')).toBe(true);
-    expect(isButton(both, 'top')).toBe(true);
-    // a shortcut on one hub makes that hub a button
+    expect(aria(both, 'bottom')).toBe(DEFAULT_TEXTS.jumpToTarget);
+    expect(aria(both, 'top')).toBe('Extra');
+    // a jump target without an extra action: the upper hub has nothing old, it assigns
+    const jumpOnly = render({ jumpTarget: () => 'a2/a2p0' });
+    expect(aria(jumpOnly, 'bottom')).toBe(DEFAULT_TEXTS.jumpToTarget);
+    expect(aria(jumpOnly, 'top')).toMatch(/^Set shortcut to /);
+    // a shortcut on one hub: that hub opens it, the other one assigns
     const one = render({ shortcuts: { top: 'a3/a3p1' } });
-    expect(isButton(one, 'top')).toBe(true);
-    expect(isButton(one, 'bottom')).toBe(false);
-    // a stale shortcut and no action: still plain
+    expect(aria(one, 'top')).toBe('Shortcut to Page 3.1');
+    expect(aria(one, 'bottom')).toMatch(/^Set shortcut to /);
+    // a stale shortcut and no action: offers to assign again
     const stale = render({ shortcuts: { top: 'gone', bottom: 'gone' } });
-    expect(isButton(stale, 'top')).toBe(false);
-    expect(isButton(stale, 'bottom')).toBe(false);
+    expect(aria(stale, 'top')).toMatch(/^Set shortcut to /);
+    expect(aria(stale, 'bottom')).toMatch(/^Set shortcut to /);
+    for (const html of [onlyExtra, both, jumpOnly, one, stale]) {
+      expect(isButton(html, 'top')).toBe(true);
+      expect(isButton(html, 'bottom')).toBe(true);
+    }
   });
 
   it('a name from the pages table wins over the node name, like the jump target', () => {
@@ -102,11 +115,19 @@ describe('WheelNav shortcuts: first render', () => {
     const html = render({
       shortcuts: { top: 'a0/a0p0' },
       extraAction: { label: '', onActivate: () => undefined },
-      texts: { shortcutFor: (n) => `Kurzbefehl ${n}`, shortcutEmpty: 'leer' },
+      texts: {
+        shortcutFor: (n) => `Kurzbefehl ${n}`,
+        shortcutEmpty: 'leer',
+        shortcutAssign: (n) => `Setze ${n}`,
+      },
     });
     expect(html).toContain('aria-label="Kurzbefehl Page 0.0"');
-    // a focusable hub whose old action has no label falls back to the "not set" text
+    // the lower hub: an old action without a label falls back to the fixed text
     expect(html).toContain('aria-label="leer"');
+    // no shortcut and nothing old: the assign text with the page name
+    expect(render({ texts: { shortcutAssign: (n) => `Setze ${n}` } })).toMatch(
+      /aria-label="Setze Page [^"]+"/,
+    );
   });
 });
 
@@ -143,11 +164,21 @@ describe('zones: source guards', () => {
     expect(grab).not.toMatch(/position|usePosition|useGrip|setT|glide/);
   });
 
-  it('the hubs are buttons only while active, and carry the no-box style', () => {
-    expect(nav).toMatch(/look\.active/);
-    expect(nav).toMatch(/role: 'button'/);
-    expect(nav).toMatch(/'aria-label': look\.aria/);
+  it('the hubs are always buttons, and carry the no-box style', () => {
+    expect(nav).not.toMatch(/look\.active/);
+    expect(nav).toMatch(/role="button"/);
+    expect(nav).toMatch(/aria-label=\{look\.aria\}/);
     expect(nav).toMatch(/style=\{NO_BOX\}/);
+  });
+
+  it('a tap decides through hubTapAction; a tap-assign is guarded and lights the gear', () => {
+    expect(nav).toMatch(/hubTapAction\(/);
+    // no assignment while a transition runs, none when there is no page at the contact, no flash
+    // with reduced motion
+    expect(nav).toMatch(/!transition && assignHere\(hub\) && !reducedMotion/);
+    expect(nav).toMatch(/flash && highlight\(flash/);
+    // the drag never assigns by itself: only its drop does, through the drop target
+    expect(grab).not.toMatch(/assign/);
   });
 
   it('the hub grab ends only for its own pointer and survives no lost events', () => {

@@ -11,7 +11,7 @@ Shared wheel navigation („Reibräder“) for Tobias' React web apps: two coupl
 pages above), swipe to the neighbouring page, back gesture goes one level back, remembers the last
 page. Extracted 2026-11-21 from the web app where it originated, because several apps use copies
 of it. **Status (2026-11-21): logic (`src/logic/`) and React components (`src/ui/`) ported with an
-English API, 99 tests; not yet consumed by an app, not published to npm.** Old → new names:
+English API, 103 tests; not yet consumed by an app, not published to npm.** Old → new names:
 [`docs/api-mapping.md`](docs/api-mapping.md). The apps that use the wheel are **not** converted from
 here: they only get a note to check the package (Tobias 2026-11-21).
 
@@ -76,19 +76,24 @@ no factory defaults.
 ```bash
 npm install
 npm run typecheck
-npm test            # 99 tests on 2026-11-22 (logic 68, ui 31)
+npm test            # 103 tests on 2026-11-22 (logic 71, ui 32)
 npm run format:check
 ```
 
 ## Hub shortcuts (2026-11-22)
 
-Each hub gear (lower, upper) can point to one page. Tap: opens it (without one, or when the node id is
-no longer in the shown level: what the hub always did). Drag from the hub (the ring drawn inside the
+Each hub gear (lower, upper) can point to one page. Tap chain (`hubTapAction`): 1. a resolvable
+shortcut opens its page; 2. else the old action (lower: jump target, else `extraAction`; upper:
+`extraAction` when a jump target exists); 3. a hub with neither assigns the page at the contact as its
+shortcut (same rule as Shift+Enter and the drop; ignored during a transition or without a page; the hub
+shows the name at once and its gear is lit blue for 500 ms, not with reduced motion; no dialog). A stale
+node id counts as no shortcut. Every hub is a focusable `role=button`; its label says what a tap does
+(`shortcutFor(name)`, the old label, or `shortcutAssign(name)` / `shortcutEmpty` for the assign tap). Drag from the hub (the ring drawn inside the
 gear, at least 32 px, always smaller than the gear's root radius): the gear goes see-through, a
 full-colour copy with the name of the page at the contact follows (a touch: 56 px above the finger;
 mouse: under the pointer). Drop on the other hub gear (whole gear up to its tip): that page becomes the
 dragged gear's shortcut. Drop on the idler gear: removes it (red × on top). Drop elsewhere: nothing.
-Keyboard (only on a hub that is a button, see Known Limitations): Shift+Enter assigns the page at the contact, Delete/Backspace clears it.
+Keyboard: Enter/Space = tap; Shift+Enter assigns the page at the contact, Delete/Backspace clears it.
 Persistence: `shortcuts` (start value), `onShortcutsChange` (every change) and `shortcutsStorageKey`
 (the package keeps them in localStorage itself, loaded on mount; no `window`, blocked storage and
 quota errors tolerated). Zones are exclusive (`zoneAt`): a hub only taps/grabs, the teeth and
@@ -112,7 +117,7 @@ first pixels and fired a tap action on small turns is gone), pieces tap (8 px) o
   the copy above a finger, drop on the small lower gear with a thumb, Safari/iOS storage that may be
   cleared, dark mode and reduced motion need the manual tests. A shortcut only resolves on the level
   shown (a page of another ring level of a nested tree is not found: the hub falls back). `shortcuts`
-  is a start value only (later prop changes are ignored). A hub is a button (role, tab stop, label) only when it has something to do: a resolvable shortcut or its old action (lower: jump target or `extraAction`; upper: jump target and `extraAction`); otherwise it renders as before shortcuts, so apps without them see no change for keyboard/screen-reader users. Trade-off: a hub with neither cannot get its first shortcut by keyboard (Shift+Enter needs focus); the pointer drag always works. `shortcutEmpty` is only the fallback label of an active hub whose old action has no label. The hub grab ends cleanly on a lost pointer capture, window blur or the grabbing pointer's cancel (another finger's cancel is ignored); a stale hold is dropped at the next pointer-down.
+  is a start value only (later prop changes are ignored). Behaviour change for apps without shortcuts: the two hubs are now always tab stops with a label, and an otherwise inert hub assigns on tap (before, it did nothing). `shortcutEmpty` is also the fallback label of a hub whose old action has no label. Hand-test only: the flash and the tap-assign on a real device (checked in Chromium with mouse and keyboard). The hub grab ends cleanly on a lost pointer capture, window blur or the grabbing pointer's cancel (another finger's cancel is ignored); a stale hold is dropped at the next pointer-down.
 - **Not consumed by any app yet**; not published to npm; no Git tag. Apps would take it by Git tag.
 - Dropped from the original: the practice run, the hint line, the close button and the built-in test
   page; its "Test" hub is now the optional `extraAction`. `data-*` attributes were renamed

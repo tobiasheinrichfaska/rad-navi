@@ -195,16 +195,17 @@ Hub shortcuts, added 2026-11-22 after the extraction; nothing here exists in the
 
 ### shortcuts.ts
 
-| New                                                                      | Meaning                                                              |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| `HubShortcuts`                                                           | `{ top?: string; bottom?: string }` node ids                         |
-| `assign`, `clear`, `isEmpty`                                             | Pure changes of the shortcuts                                        |
-| `resolveShortcut`                                                        | Index of the shortcut's page in a layout, or none (unset / stale)    |
-| `serializeShortcuts`, `parseShortcuts`, `cleanShortcuts`                 | Versioned JSON text form; strict, garbage gives `{}`                 |
-| `loadShortcuts`, `saveShortcuts`, `StorageLike`                          | Storage wrapper over an injected storage (try/catch inside)          |
-| `fitLabel`                                                               | A name fitted to a hub (shrunk, then cut)                            |
-| `useShortcuts`, `browserStorage`, `useHubGrab`, `HubDrag`, `HubCopy`     | UI hooks and the carried copy                                        |
-| `gears.ts`: `rootRadius`, `ringRadius`                                   | Root radius of a gear and the ring drawn inside it                   |
-| `WheelNav` props `shortcuts`, `onShortcutsChange`, `shortcutsStorageKey` | Start value, change callback, key for the package's own localStorage |
-| `WheelTexts`: `shortcutFor`, `shortcutEmpty`, `shortcutDelete`           | New texts (English defaults)                                         |
-| `GripWheel.zone`                                                         | `'turn' \| 'piece'` (new field), `useGrip().busy()`                  |
+| New                                                                              | Meaning                                                                                              |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `HubShortcuts`                                                                   | `{ top?: string; bottom?: string }` node ids                                                         |
+| `assign`, `clear`, `isEmpty`                                                     | Pure changes of the shortcuts                                                                        |
+| `resolveShortcut`                                                                | Index of the shortcut's page in a layout, or none (unset / stale)                                    |
+| `serializeShortcuts`, `parseShortcuts`, `cleanShortcuts`                         | Versioned JSON text form; strict, garbage gives `{}`                                                 |
+| `loadShortcuts`, `saveShortcuts`, `StorageLike`                                  | Storage wrapper over an injected storage (try/catch inside)                                          |
+| `fitLabel`                                                                       | A name fitted to a hub (shrunk, then cut)                                                            |
+| `hubTapAction`, `HubTapAction`                                                   | Tap chain of a hub: `'shortcut'`, else `'old'` action, else `'assign'`                               |
+| `useShortcuts`, `browserStorage`, `useHubGrab`, `HubDrag`, `HubCopy`             | UI hooks and the carried copy                                                                        |
+| `gears.ts`: `rootRadius`, `ringRadius`                                           | Root radius of a gear and the ring drawn inside it                                                   |
+| `WheelNav` props `shortcuts`, `onShortcutsChange`, `shortcutsStorageKey`         | Start value, change callback, key for the package's own localStorage                                 |
+| `WheelTexts`: `shortcutFor`, `shortcutAssign`, `shortcutEmpty`, `shortcutDelete` | New texts (English defaults); `shortcutAssign(name)` / `shortcutEmpty` label a hub whose tap assigns |
+| `GripWheel.zone`                                                                 | `'turn' \| 'piece'` (new field), `useGrip().busy()`                                                  |

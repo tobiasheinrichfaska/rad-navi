@@ -39,6 +39,18 @@ export function resolveShortcut(layout: Layout, nodeId: string | undefined): num
   return k >= 0 ? k : undefined;
 }
 
+/** What a tap on a hub does. */
+export type HubTapAction = 'shortcut' | 'old' | 'assign';
+
+/**
+ * The fallback chain of a hub tap: a resolvable shortcut opens its page; else the hub's old action
+ * (jump target or extra action) runs; a hub with neither assigns the page at the contact.
+ */
+export function hubTapAction(hasShortcut: boolean, hasOldAction: boolean): HubTapAction {
+  if (hasShortcut) return 'shortcut';
+  return hasOldAction ? 'old' : 'assign';
+}
+
 export const isEmpty = (s: HubShortcuts): boolean => s.top === undefined && s.bottom === undefined;
 
 const validId = (v: unknown): v is string =>

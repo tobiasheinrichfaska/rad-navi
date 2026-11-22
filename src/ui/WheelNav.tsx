@@ -34,6 +34,7 @@ import {
   assign,
   clear,
   fitLabel,
+  hubTapAction,
   resolveShortcut,
   serializeShortcuts,
   type HubShortcuts,
@@ -62,6 +63,8 @@ const OPEN_MS = 260;
 /** The chosen area's outline on the lower wheel — off for a try. */
 const AREA_OUTLINED = false;
 const CLOSE_MS = 280;
+/** How long a hub gear stays lit after a tap gave it a shortcut. */
+const FLASH_MS = 500;
 /** The page wheel touches the area wheel with its bottom and turns the other way. */
 const PAGE_WHEEL: Placement = { offset: Math.PI, direction: -1 };
 
@@ -169,6 +172,13 @@ export function WheelNav({
     current: shortcutsNow,
     set: setShortcuts,
   } = useShortcuts(initialShortcuts, shortcutsStorageKey, onShortcutsChange);
+  // The hub that was just given a shortcut by a tap: lit for a moment (not with reduced motion).
+  const [flash, setFlash] = useState<Hub | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const id = window.setTimeout(() => setFlash(null), FLASH_MS);
+    return () => window.clearTimeout(id);
+  }, [flash]);
   const commitShortcuts = (next: HubShortcuts) => {
     if (serializeShortcuts(next) !== serializeShortcuts(shortcutsNow.current)) setShortcuts(next);
   };
@@ -277,17 +287,27 @@ export function WheelNav({
 
   const grip = useGrip(layout, position, wheelAt, !!transition);
 
-  // A tap on a hub: its shortcut; without one (or one that is gone) what the hub always did.
+  const pageHere = () => layout.pages[pageAtPointer(layout, position.now.current)]?.node;
+  /** Makes the page at the contact the hub's shortcut; false when there is none. */
+  const assignHere = (hub: Hub): boolean => {
+    const node = pageHere();
+    if (!node) return false;
+    commitShortcuts(assign(shortcutsNow.current, hub, node.id));
+    return true;
+  };
+  // A tap on a hub, see `hubTapAction`: its shortcut; else what the hub always did; with neither,
+  // the page at the contact becomes its shortcut (lit for a moment).
   const tapHub = (hub: Hub) => {
     const k = resolveShortcut(layout, shortcutsNow.current[hub]);
-    if (k !== undefined) openPage(k);
-    else if (hub === 'bottom') tapLowerHub();
-    else if (withJump && extraAction) runExtra();
-  };
-  const pageHere = () => layout.pages[pageAtPointer(layout, position.now.current)]?.node;
-  const assignHere = (hub: Hub) => {
-    const node = pageHere();
-    if (node) commitShortcuts(assign(shortcutsNow.current, hub, node.id));
+    const oldAction =
+      hub === 'bottom' ? !!jumpTarget?.() || !!extraAction : withJump && !!extraAction;
+    const what = hubTapAction(k !== undefined, oldAction);
+    if (what === 'shortcut') {
+      if (k !== undefined) openPage(k);
+    } else if (what === 'old') {
+      if (hub === 'bottom') tapLowerHub();
+      else runExtra();
+    } else if (!transition && assignHere(hub) && !reducedMotion) setFlash(hub);
   };
   const hubs = useHubGrab({
     zoneOf,
@@ -445,30 +465,31 @@ export function WheelNav({
   const targetName = targetNode ? nameOf(targetNode) : undefined;
   const lowerDiscR = Math.max(16, rBottom * 0.14);
   const hubDiscR = (hub: Hub) => (hub === 'bottom' ? lowerDiscR : topHubR);
-  // What a hub shows and says: its shortcut, else what it did before shortcuts. `active` is true
-  // only when the hub has something to do (a shortcut or the old action): only then it is a button
-  // for the keyboard and screen readers, otherwise it renders as it did before shortcuts existed.
+  // What a hub shows and says: its shortcut, else what it did before shortcuts; with neither, it
+  // says what a tap does now (assign the page at the contact). Every hub has an action, so every
+  // hub is a button for the keyboard and screen readers.
   const hubLook = (hub: Hub) => {
     const node = shortcutNode(hub);
     if (node) {
       const name = nameOf(node);
-      return { label: name, aria: texts.shortcutFor(name), fitted: true, active: true };
+      return { label: name, aria: texts.shortcutFor(name), fitted: true };
     }
+    const here = pageHere();
+    const assignAria = here ? texts.shortcutAssign(nameOf(here)) : texts.shortcutEmpty;
     if (hub === 'bottom') {
+      const old = !!targetId || !!extraAction;
       const aria = targetId ? texts.jumpToTarget : extraAction?.label;
       return {
         label: targetName ?? extraAction?.label,
-        aria: aria || texts.shortcutEmpty,
+        aria: old ? aria || texts.shortcutEmpty : assignAria,
         fitted: false,
-        active: !!targetId || !!extraAction,
       };
     }
     const label = withJump ? extraAction?.label : undefined;
     return {
       label,
-      aria: label || texts.shortcutEmpty,
+      aria: label || (withJump && extraAction ? texts.shortcutEmpty : assignAria),
       fitted: false,
-      active: withJump && !!extraAction,
     };
   };
   const dragging = hubs.drag;
@@ -486,7 +507,7 @@ export function WheelNav({
       commitShortcuts(clear(shortcutsNow.current, hub));
     }
   };
-  /** One hub: a round label over the gear; a button for screen readers and the keyboard only while it has something to do. */
+  /** One hub: a round label over the gear, a button for screen readers and the keyboard. */
   const hubButton = (hub: Hub) => {
     const look = hubLook(hub);
     const gear = gearOf(hub);
@@ -498,17 +519,13 @@ export function WheelNav({
     return (
       <g
         key={hub}
-        {...(look.active
-          ? {
-              role: 'button',
-              tabIndex: 0,
-              'aria-label': look.aria,
-              onKeyDown: hubKeys(hub),
-              onClick: (e: { detail: number }) => {
-                if (e.detail === 0) tapHub(hub);
-              },
-            }
-          : {})}
+        role="button"
+        tabIndex={0}
+        aria-label={look.aria}
+        onKeyDown={hubKeys(hub)}
+        onClick={(e) => {
+          if (e.detail === 0) tapHub(hub);
+        }}
         data-hub={hub}
         style={NO_BOX}
         opacity={cover * (dragging?.hub === hub ? FADED : 1)}
@@ -699,6 +716,7 @@ export function WheelNav({
           />
           {dragging && otherHub && highlight(otherHub, dragTarget === otherHub, '#2563c9', 'tint')}
           {dragging && highlight('idler', dragTarget === 'delete', '#d1242f', 'tint')}
+          {flash && highlight(flash, true, '#2563c9', 'tint')}
           {ghost && (
             <RingGhost
               wedge={ghost.wedge}
@@ -726,6 +744,7 @@ export function WheelNav({
           )}
           {dragging && otherHub && highlight(otherHub, dragTarget === otherHub, '#2563c9', 'mark')}
           {dragging && highlight('idler', dragTarget === 'delete', '#d1242f', 'mark', '×')}
+          {flash && highlight(flash, true, '#2563c9', 'mark')}
         </svg>
       </div>
     </Frame>
