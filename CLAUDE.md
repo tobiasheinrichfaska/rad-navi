@@ -47,6 +47,8 @@ Public entry: `src/index.ts`.
 | `CLAUDE.md` | Project documentation and conventions |
 | `README.md` | Short description, install, usage, license section |
 | `FEATURES_REQUIRED.md` | Critical user paths (target; only the logic and first render are covered by tests) |
+| `docs/wochenpruefung.md` | Instructions for the scheduled weekly check (build, audit, secrets/private names, code, config) |
+| `SECURITY.md`, `.github/dependabot.yml` | Reporting channel; weekly dependency/action update PRs |
 | `docs/api-mapping.md` | Every exported name: old German name → new English name → file (for migrating apps) |
 | `manual_tests/` | Human-tester instructions (README only so far) |
 | `src/index.ts` | Public entry: components, hooks, types, logic |
