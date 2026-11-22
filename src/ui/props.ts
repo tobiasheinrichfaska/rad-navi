@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { HubShortcuts } from '../logic/shortcuts.ts';
 import type { NavNode, PageTable } from '../logic/tree.ts';
 
 /** Every text the package shows. The app passes the ones it wants to change (any language). */
@@ -21,6 +22,12 @@ export interface WheelTexts {
   readonly placeholder: (name: string) => string;
   /** The button on a placeholder that goes back. */
   readonly backButton: (name: string) => string;
+  /** Label of a hub that holds a shortcut to the page `name`. */
+  readonly shortcutFor: (name: string) => string;
+  /** Label of a hub without a shortcut or other job. */
+  readonly shortcutEmpty: string;
+  /** Shown on the idler gear while a hub gear is carried over it: drop to remove the shortcut. */
+  readonly shortcutDelete: string;
 }
 
 export const DEFAULT_TEXTS: WheelTexts = {
@@ -33,6 +40,9 @@ export const DEFAULT_TEXTS: WheelTexts = {
   placeholderPlanned: 'This page is planned and will come later.',
   placeholder: (name) => `The page “${name}” will go here.`,
   backButton: (name) => `↩ Back to ${name}`,
+  shortcutFor: (name) => `Shortcut to ${name}`,
+  shortcutEmpty: 'Shortcut (not set)',
+  shortcutDelete: 'Remove shortcut',
 };
 
 /** An extra round button in the upper hub (and, without a jump target, the lower one). */
@@ -70,6 +80,19 @@ export interface WheelNavProps {
   readonly extraAction?: ExtraAction | undefined;
   /** CSS selector of fields on a page that handle touch themselves: no page swipe starts on them. */
   readonly ownGestureSelector?: string | undefined;
+  /**
+   * Shortcuts on the two hub gears (node ids), the start value. Drag a hub gear onto the other one to
+   * point it to the page at the contact, onto the idler gear to remove it; a tap opens the page.
+   * Without one a hub does what it always did.
+   */
+  readonly shortcuts?: HubShortcuts | undefined;
+  /** Called with the new shortcuts on every change (to keep them in the app's own storage). */
+  readonly onShortcutsChange?: ((shortcuts: HubShortcuts) => void) | undefined;
+  /**
+   * With a key the package keeps the shortcuts itself in localStorage under it (and loads them on
+   * start, unless `shortcuts` is given). Blocked or missing storage is tolerated.
+   */
+  readonly shortcutsStorageKey?: string | undefined;
   /** Texts; missing ones come from `DEFAULT_TEXTS`. */
   readonly texts?: Partial<WheelTexts> | undefined;
 }

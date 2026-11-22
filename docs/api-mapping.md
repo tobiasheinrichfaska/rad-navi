@@ -177,3 +177,34 @@ Everything below is re-exported from `src/index.ts`, together with the logic exp
 
 `start.ts` (start area by clock, jump target, remembered place) and `uebung.ts` (practice run) stay in
 the app.
+
+## New in the English package (no old name)
+
+Hub shortcuts, added 2026-11-22 after the extraction; nothing here exists in the German original.
+
+### zones.ts
+
+| New                                       | Meaning                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------ |
+| `zoneAt`                                  | The one zone (`hub`, `turn`, `piece`, `none`) of a point of the wheel screen   |
+| `ZoneGeometry`, `Zone`, `ZoneKind`, `Hub` | Input geometry, the zone result, its kind, `'bottom' \| 'top'`                 |
+| `hubRadius`, `MIN_HUB_RADIUS`             | Hit radius of a hub (at least 32 px, below the gear's root radius)             |
+| `gesture`, `TAP_SLOP`, `TURN_SLOP`        | When a pointer has left the tap (8 px on hub/piece, 2 px on the turn zone)     |
+| `dropTarget`, `DropTarget`                | What a carried hub gear is dropped on: the other hub, `'delete'` (idler), none |
+| `copyPoint`, `TOUCH_LIFT`                 | Where the carried copy is drawn (under a mouse, 56 px above a finger)          |
+
+### shortcuts.ts
+
+| New                                                                      | Meaning                                                              |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `HubShortcuts`                                                           | `{ top?: string; bottom?: string }` node ids                         |
+| `assign`, `clear`, `isEmpty`                                             | Pure changes of the shortcuts                                        |
+| `resolveShortcut`                                                        | Index of the shortcut's page in a layout, or none (unset / stale)    |
+| `serializeShortcuts`, `parseShortcuts`, `cleanShortcuts`                 | Versioned JSON text form; strict, garbage gives `{}`                 |
+| `loadShortcuts`, `saveShortcuts`, `StorageLike`                          | Storage wrapper over an injected storage (try/catch inside)          |
+| `fitLabel`                                                               | A name fitted to a hub (shrunk, then cut)                            |
+| `useShortcuts`, `browserStorage`, `useHubGrab`, `HubDrag`, `HubCopy`     | UI hooks and the carried copy                                        |
+| `gears.ts`: `rootRadius`, `ringRadius`                                   | Root radius of a gear and the ring drawn inside it                   |
+| `WheelNav` props `shortcuts`, `onShortcutsChange`, `shortcutsStorageKey` | Start value, change callback, key for the package's own localStorage |
+| `WheelTexts`: `shortcutFor`, `shortcutEmpty`, `shortcutDelete`           | New texts (English defaults)                                         |
+| `GripWheel.zone`                                                         | `'turn' \| 'piece'` (new field), `useGrip().busy()`                  |

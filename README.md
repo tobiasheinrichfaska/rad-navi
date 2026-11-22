@@ -31,6 +31,12 @@ const tree = distributor('root', 'Root', [areaNode(pages, 'home', 'Home', ['toda
 />;
 ```
 
+**Hub shortcuts:** each of the two hub gears can point to a page. Tap it to open the page; drag it onto
+the other hub gear to point it to the page at the contact, onto the small idler gear to remove it. Pass
+`shortcutsStorageKey="my-app-shortcuts"` and the package keeps them in localStorage (or take
+`shortcuts` / `onShortcutsChange` and store them yourself). Without any, the hubs do what they did
+before.
+
 All props and texts: `src/ui/props.ts`. Names of the original German API and their English
 equivalents: [docs/api-mapping.md](docs/api-mapping.md). Gestures and look can only be checked on a
 device: see `manual_tests/`.

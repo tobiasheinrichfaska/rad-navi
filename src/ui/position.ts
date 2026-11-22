@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { NavNode } from '../logic/tree.ts';
+import { gesture } from '../logic/zones.ts';
 import { throwOff, wheelAngle, angleDiff, momentum } from '../logic/wheel.ts';
 import {
   layoutOf,
@@ -204,7 +205,10 @@ export interface GripWheel {
   readonly cx: number;
   readonly cy: number;
   readonly placement: Placement;
+  /** `piece`: a short touch is a tap on it; `turn`: it only turns (no tap action, no grab). */
+  readonly zone: 'turn' | 'piece';
   readonly snap: (t: number) => number;
+  /** What a tap does (a `turn` zone has none). */
   readonly tap: (angle: number, distance: number) => void;
   /** How far t moves for a turn of the finger by `angle` (a gear behind turns at its ratio). */
   readonly dt?: (angle: number) => number;
@@ -213,6 +217,7 @@ export interface GripWheel {
 interface Grip {
   readonly id: number;
   readonly wheel: GripWheel;
+  /** The finger's angle at the last move; until the turn starts, the angle at pointer-down. */
   last: number;
   readonly x: number;
   readonly y: number;
@@ -237,6 +242,8 @@ export function useGrip(
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   return {
+    /** True while a finger holds a wheel. */
+    busy: () => grip.current !== null,
     onPointerDown: (e: PointerEvent<SVGSVGElement>) => {
       if (locked) return;
       const { x, y } = point(e);
@@ -260,17 +267,20 @@ export function useGrip(
       const g = grip.current;
       if (!g || g.id !== e.pointerId) return;
       const { x, y } = point(e);
-      if (Math.hypot(x - g.x, y - g.y) > 8) g.far = true;
-      const angle = wheelAngle(x, y, g.wheel.cx, g.wheel.cy);
-      // Near a centre the angle jumps: turn only with the finger well away from it.
-      if (g.far && Math.hypot(x - g.wheel.cx, y - g.wheel.cy) > 30) {
-        const d = angleDiff(g.last, angle);
-        position.setT(
-          position.now.current +
-            (g.wheel.dt ? g.wheel.dt(d) : positionForTurn(layout, d, g.wheel.placement)),
-        );
+      if (!g.far && gesture(g.wheel.zone, Math.hypot(x - g.x, y - g.y)) === 'active') g.far = true;
+      if (g.far) {
+        // The turn counts from the angle at pointer-down: nothing of the first pixels is lost.
+        const angle = wheelAngle(x, y, g.wheel.cx, g.wheel.cy);
+        // Near a centre the angle jumps: turn only with the finger well away from it.
+        if (Math.hypot(x - g.wheel.cx, y - g.wheel.cy) > 30) {
+          const d = angleDiff(g.last, angle);
+          position.setT(
+            position.now.current +
+              (g.wheel.dt ? g.wheel.dt(d) : positionForTurn(layout, d, g.wheel.placement)),
+          );
+        }
+        g.last = angle;
       }
-      g.last = angle;
       g.samples = [
         ...g.samples.filter((p) => e.timeStamp - p.t < 100),
         { t: e.timeStamp, turn: position.now.current },
@@ -282,6 +292,11 @@ export function useGrip(
       if (!g || g.id !== e.pointerId) return;
       grip.current = null;
       const { x, y } = point(e);
+      if (!g.far && g.wheel.zone === 'turn') {
+        // a touch on the turn zone: no action, but a wheel that was running on settles
+        position.glide(g.wheel.snap(position.now.current), 160);
+        return;
+      }
       if (!g.far && e.timeStamp - g.since < 500) {
         g.wheel.tap(
           wheelAngle(x, y, g.wheel.cx, g.wheel.cy),

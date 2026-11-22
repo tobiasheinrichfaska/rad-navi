@@ -1,4 +1,13 @@
-import { turns, tipRadius, type Gear, type GearTrain } from '../logic/gears.ts';
+import {
+  turns,
+  tipRadius,
+  ringRadius,
+  rootRadius,
+  type Gear,
+  type GearName,
+  type GearTrain,
+} from '../logic/gears.ts';
+import { fitLabel } from '../logic/shortcuts.ts';
 import { gearPath } from '../logic/wheel.ts';
 import type { GearColors } from './colors.ts';
 
@@ -12,6 +21,7 @@ function GearShape({
   color,
   edge,
   axle,
+  opacity = 1,
 }: {
   gear: Gear;
   turn: number;
@@ -19,12 +29,13 @@ function GearShape({
   color: string;
   edge: string;
   axle: string;
+  opacity?: number;
 }) {
   const tip = tipRadius(gear, module);
-  const root = gear.pitchRadius - module * 1.1;
+  const root = rootRadius(gear, module);
   return (
     // where the gear stands, for the local checks
-    <g data-gear={gear.name} data-x={gear.x} data-y={gear.y} data-tip={tip}>
+    <g data-gear={gear.name} data-x={gear.x} data-y={gear.y} data-tip={tip} opacity={opacity}>
       <path
         transform={`translate(${gear.x} ${gear.y}) rotate(${(turn * 180) / Math.PI})`}
         d={gearPath(gear.teeth, root, tip)}
@@ -37,7 +48,7 @@ function GearShape({
       <circle
         cx={gear.x}
         cy={gear.y}
-        r={root * 0.62}
+        r={ringRadius(gear, module)}
         fill="none"
         stroke={edge}
         strokeWidth={1}
@@ -47,6 +58,9 @@ function GearShape({
     </g>
   );
 }
+
+/** Opacity of the original hub gear while its copy is carried. */
+export const FADED = 0.3;
 
 /** The gears behind the wheels (big compound gear, idler, small compound gear). */
 export function GearsBehind({
@@ -87,11 +101,14 @@ export function HubGears({
   bottom,
   colors,
   opacity,
+  faded,
 }: {
   train: GearTrain;
   bottom: number;
   colors: GearColors;
   opacity: number;
+  /** A hub gear in the hand: the original stands see-through while its copy is carried. */
+  faded?: GearName | undefined;
 }) {
   const angles = turns(train, bottom);
   return (
@@ -99,6 +116,7 @@ export function HubGears({
       {train.gears.map((gear, i) =>
         gear.name === 'bottom' || gear.name === 'top' ? (
           <GearShape
+            opacity={gear.name === faded ? FADED : 1}
             key={gear.name}
             gear={gear}
             turn={angles[i] ?? 0}
@@ -109,6 +127,59 @@ export function HubGears({
           />
         ) : null,
       )}
+    </g>
+  );
+}
+
+/**
+ * The copy of a hub gear carried by a finger or the mouse: full colour, opaque, drawn on top of
+ * everything, with the name of the page it would point to on its hub.
+ */
+export function HubCopy({
+  gear,
+  module,
+  x,
+  y,
+  colors,
+  name,
+  ground,
+  text,
+  hubRadius,
+}: {
+  gear: Gear;
+  module: number;
+  x: number;
+  y: number;
+  colors: GearColors;
+  name: string;
+  ground: string;
+  text: string;
+  hubRadius: number;
+}) {
+  const tip = tipRadius(gear, module);
+  const root = rootRadius(gear, module);
+  const label = fitLabel(name, hubRadius * 1.7, Math.max(12, hubRadius * 0.6));
+  return (
+    <g data-copy={gear.name} transform={`translate(${x} ${y})`} style={{ pointerEvents: 'none' }}>
+      <circle r={tip} cy={5} fill="#000" opacity={0.22} />
+      <path
+        d={gearPath(gear.teeth, root, tip)}
+        fill={colors.middle}
+        stroke={colors.dark}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <circle r={ringRadius(gear, module)} fill="none" stroke={colors.dark} strokeWidth={1} />
+      <circle r={hubRadius} fill={ground} />
+      <text
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={text}
+        fontSize={label.size}
+        fontWeight={700}
+      >
+        {label.text}
+      </text>
     </g>
   );
 }
