@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { copyPoint, gesture, type Hub, type Zone } from '../logic/zones.ts';
 
 /** A hub gear in the hand: which one, and where its copy is drawn (SVG pixels). */
@@ -38,19 +38,45 @@ export function useHubGrab(options: {
     hold.current = null;
     setDrag(null);
   };
+  // Safety nets: if the grabbing pointer's up/cancel never arrives, the hold must not live on and
+  // swallow every later pointer-down and the mouse wheel. Losing the window ends the grab too.
+  useEffect(() => {
+    const cancel = (e: Event) => {
+      const h = hold.current;
+      if (!h) return;
+      if (e.type === 'pointercancel' && (e as globalThis.PointerEvent).pointerId !== h.id) return;
+      end();
+    };
+    window.addEventListener('blur', cancel);
+    window.addEventListener('pointercancel', cancel);
+    return () => {
+      window.removeEventListener('blur', cancel);
+      window.removeEventListener('pointercancel', cancel);
+    };
+  }, []);
   return {
     drag,
     /** True while a hub is held (a finger on it or its copy on the way). */
     held: () => hold.current !== null,
     onPointerDown: (e: PointerEvent<SVGSVGElement>): boolean => {
-      // a second finger while one holds a hub: swallowed, it must not turn a wheel
-      if (hold.current) return true;
+      const h = hold.current;
+      if (h) {
+        // a hold whose pointer is gone (lost up/cancel) is stale: drop it and start afresh
+        const alive = h.id !== e.pointerId && e.currentTarget.hasPointerCapture?.(h.id);
+        // a second finger while one holds a hub: swallowed, it must not turn a wheel
+        if (alive) return true;
+        end();
+      }
       if (options.locked()) return false;
       const { x, y } = point(e);
       const zone = options.zoneOf(x, y);
       if (zone.zone !== 'hub') return false;
       hold.current = { id: e.pointerId, hub: zone.hub, x, y, since: e.timeStamp, grabbed: false };
-      e.currentTarget.setPointerCapture(e.pointerId);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // the pointer is already gone: no capture, but the grab still ends on up/cancel/blur
+      }
       return true;
     },
     onPointerMove: (e: PointerEvent<SVGSVGElement>): boolean => {
@@ -76,10 +102,17 @@ export function useHubGrab(options: {
       }
       return true;
     },
-    onPointerCancel: (): boolean => {
-      if (!hold.current) return false;
+    /** Only the grabbing pointer's cancel ends the grab; another finger's is swallowed. */
+    onPointerCancel: (e: PointerEvent<SVGSVGElement>): boolean => {
+      const h = hold.current;
+      if (!h) return false;
+      if (h.id !== e.pointerId) return true;
       end();
       return true;
+    },
+    /** The grabbing pointer lost its capture without up/cancel: end the grab, change nothing. */
+    onLostPointerCapture: (e: PointerEvent<SVGSVGElement>): void => {
+      if (hold.current?.id === e.pointerId) end();
     },
   };
 }

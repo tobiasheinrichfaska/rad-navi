@@ -24,7 +24,7 @@ export interface WheelTexts {
   readonly backButton: (name: string) => string;
   /** Label of a hub that holds a shortcut to the page `name`. */
   readonly shortcutFor: (name: string) => string;
-  /** Label of a hub without a shortcut or other job. */
+  /** Fallback label of a hub that is a button (it has an old action) but whose action has no label. */
   readonly shortcutEmpty: string;
   /** Shown on the idler gear while a hub gear is carried over it: drop to remove the shortcut. */
   readonly shortcutDelete: string;

@@ -445,24 +445,30 @@ export function WheelNav({
   const targetName = targetNode ? nameOf(targetNode) : undefined;
   const lowerDiscR = Math.max(16, rBottom * 0.14);
   const hubDiscR = (hub: Hub) => (hub === 'bottom' ? lowerDiscR : topHubR);
-  // What a hub shows and says: its shortcut, else what it did before shortcuts.
+  // What a hub shows and says: its shortcut, else what it did before shortcuts. `active` is true
+  // only when the hub has something to do (a shortcut or the old action): only then it is a button
+  // for the keyboard and screen readers, otherwise it renders as it did before shortcuts existed.
   const hubLook = (hub: Hub) => {
     const node = shortcutNode(hub);
     if (node) {
       const name = nameOf(node);
-      return { label: name, aria: texts.shortcutFor(name), fitted: true };
+      return { label: name, aria: texts.shortcutFor(name), fitted: true, active: true };
     }
     if (hub === 'bottom') {
+      const aria = targetId ? texts.jumpToTarget : extraAction?.label;
       return {
         label: targetName ?? extraAction?.label,
-        aria: (targetId ? texts.jumpToTarget : extraAction?.label) ?? texts.shortcutEmpty,
+        aria: aria || texts.shortcutEmpty,
         fitted: false,
+        active: !!targetId || !!extraAction,
       };
     }
+    const label = withJump ? extraAction?.label : undefined;
     return {
-      label: withJump ? extraAction?.label : undefined,
-      aria: (withJump ? extraAction?.label : undefined) ?? texts.shortcutEmpty,
+      label,
+      aria: label || texts.shortcutEmpty,
       fitted: false,
+      active: withJump && !!extraAction,
     };
   };
   const dragging = hubs.drag;
@@ -480,7 +486,7 @@ export function WheelNav({
       commitShortcuts(clear(shortcutsNow.current, hub));
     }
   };
-  /** One hub: a round label over the gear, a button for screen readers and the keyboard. */
+  /** One hub: a round label over the gear; a button for screen readers and the keyboard only while it has something to do. */
   const hubButton = (hub: Hub) => {
     const look = hubLook(hub);
     const gear = gearOf(hub);
@@ -492,16 +498,20 @@ export function WheelNav({
     return (
       <g
         key={hub}
-        role="button"
-        tabIndex={0}
-        aria-label={look.aria}
+        {...(look.active
+          ? {
+              role: 'button',
+              tabIndex: 0,
+              'aria-label': look.aria,
+              onKeyDown: hubKeys(hub),
+              onClick: (e: { detail: number }) => {
+                if (e.detail === 0) tapHub(hub);
+              },
+            }
+          : {})}
         data-hub={hub}
         style={NO_BOX}
         opacity={cover * (dragging?.hub === hub ? FADED : 1)}
-        onKeyDown={hubKeys(hub)}
-        onClick={(e) => {
-          if (e.detail === 0) tapHub(hub);
-        }}
       >
         {(hub === 'bottom' || shown) && (
           <circle cx={gear.x} cy={gear.y} r={r} fill={f.ground} opacity={0.9} />
@@ -633,9 +643,10 @@ export function WheelNav({
           onPointerUp={(e) => {
             if (!hubs.onPointerUp(e)) grip.onPointerUp(e);
           }}
-          onPointerCancel={() => {
-            if (!hubs.onPointerCancel()) grip.onPointerCancel();
+          onPointerCancel={(e) => {
+            if (!hubs.onPointerCancel(e)) grip.onPointerCancel();
           }}
+          onLostPointerCapture={(e) => hubs.onLostPointerCapture(e)}
         >
           {/* the works behind the wheels, seen through the rings */}
           <GearsBehind
