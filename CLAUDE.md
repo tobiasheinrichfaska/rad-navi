@@ -10,7 +10,7 @@
 Shared wheel navigation („Reibräder“) for Tobias' React web apps: two coupled wheels (areas below,
 pages above), swipe to the neighbouring page, back gesture goes one level back, remembers the last
 page. Extracted 2026-11-21 from the web app where it originated, because several apps use copies
-of it. **Status (2026-11-21): logic (`src/logic/`) and React components (`src/ui/`) ported with an
+of it. **Status (2026-11-24): logic (`src/logic/`) and React components (`src/ui/`) ported with an
 English API, 105 tests; not yet consumed by an app, not published to npm.** Old → new names:
 [`docs/api-mapping.md`](docs/api-mapping.md). The apps that use the wheel are **not** converted from
 here: they only get a note to check the package (Tobias 2026-11-21).
@@ -127,4 +127,4 @@ first pixels and fired a tap action on small turns is gone), pieces tap (8 px) o
   `keyboardFocus` is exported but unused; `Placeholder`'s back button can never show.
 - The coupling guard forbids app words in `src/`.
 
-*Last updated: 2026-11-22*
+*Last updated: 2026-11-24*
