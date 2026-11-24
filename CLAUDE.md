@@ -11,7 +11,7 @@ Shared wheel navigation („Reibräder“) for Tobias' React web apps: two coupl
 pages above), swipe to the neighbouring page, back gesture goes one level back, remembers the last
 page. Extracted 2026-11-21 from the web app where it originated, because several apps use copies
 of it. **Status (2026-11-21): logic (`src/logic/`) and React components (`src/ui/`) ported with an
-English API, 103 tests; not yet consumed by an app, not published to npm.** Old → new names:
+English API, 105 tests; not yet consumed by an app, not published to npm.** Old → new names:
 [`docs/api-mapping.md`](docs/api-mapping.md). The apps that use the wheel are **not** converted from
 here: they only get a note to check the package (Tobias 2026-11-21).
 
@@ -76,7 +76,7 @@ no factory defaults.
 ```bash
 npm install
 npm run typecheck
-npm test            # 103 tests on 2026-11-22 (logic 71, ui 32)
+npm test            # 105 tests on 2026-11-24 (logic 73, ui 32)
 npm run format:check
 ```
 
