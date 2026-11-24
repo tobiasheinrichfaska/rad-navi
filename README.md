@@ -5,7 +5,7 @@ swipe to the neighbouring page, back gesture goes one level back, remembers the 
 areas and pages, the page contents, start/jump targets and all texts come from your app; the package
 holds no app data.
 
-**Status:** early (0.1.0), not published to npm. Web only (SVG/DOM), not for React Native builds.
+**Status:** early (0.1.1), not published to npm. Web only (SVG/DOM), not for React Native builds.
 
 ## Install and test
 
