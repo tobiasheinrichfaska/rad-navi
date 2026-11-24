@@ -1,7 +1,7 @@
 # CLAUDE.md — rad-navi
 
-> Workspace-wide conventions (language, git, build, architecture, testing, collaboration):
-> [`c:\skripte\private\general stuff\CLAUDE.md`](../../private/general%20stuff/CLAUDE.md)
+> Workspace-wide conventions (language, git, build, architecture, testing, collaboration) are kept
+> in the owner's private workspace, outside this repo.
 
 ---
 
@@ -48,7 +48,7 @@ Public entry: `src/index.ts`.
 | `README.md` | Short description, install, usage, license section |
 | `FEATURES_REQUIRED.md` | Critical user paths (target; only the logic and first render are covered by tests) |
 | `docs/api-mapping.md` | Every exported name: old German name → new English name → file (for migrating apps) |
-| `manual_tests/` | Human-tester instructions (README only so far) |
+| `manual_tests/` | Human-tester instructions (`README.md`, `01_mausrad.md`) |
 | `src/index.ts` | Public entry: components, hooks, types, logic |
 | `src/logic/tree.ts` | `NavNode`, `PageTable`, `areaNode`, `distributor`, `pagesIn`, `nodesWithPage`, `pathTo`, `areaOf` — the tree is an input |
 | `src/logic/scroll.ts` | Mouse wheel → pages: `wheelSteps` (notch = one page, touchpad deltas add up), `turnAngle` (direction by the pointer's side, dead zone on the middle line) |

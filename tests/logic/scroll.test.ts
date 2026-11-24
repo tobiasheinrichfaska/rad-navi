@@ -41,6 +41,14 @@ describe('turnAngle', () => {
     expect(turnAngle(1, DEAD_ZONE - 1, 0.5)).toBe(0);
     expect(turnAngle(1, -(DEAD_ZONE - 1), 0.5)).toBe(0);
   });
+  it('turns nothing just inside the dead zone', () => {
+    expect(turnAngle(1, DEAD_ZONE - 0.01, 0.5)).toBe(0);
+    expect(turnAngle(1, -(DEAD_ZONE - 0.01), 0.5)).toBe(0);
+  });
+  it('turns at exactly the dead zone edge', () => {
+    expect(turnAngle(1, DEAD_ZONE, 0.5)).toBe(-0.5);
+    expect(turnAngle(1, -DEAD_ZONE, 0.5)).toBe(0.5);
+  });
   it('turns nothing for zero steps', () => {
     expect(turnAngle(0, 50, 0.5)).toBe(0);
   });
