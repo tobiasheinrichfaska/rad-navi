@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { NodeStorage } from '../logic/lastNode.ts';
 import type { HubShortcuts } from '../logic/shortcuts.ts';
 import type { NavNode, PageTable } from '../logic/tree.ts';
 
@@ -97,6 +98,15 @@ export interface WheelNavProps {
    * start, unless `shortcuts` is given). Blocked or missing storage is tolerated.
    */
   readonly shortcutsStorageKey?: string | undefined;
+  /**
+   * Opt-in: with a key the package remembers the page that was open (only its node id) in
+   * localStorage and opens there on the next start if the page still exists in the tree, else on the
+   * first page. `startNode` wins over it. Blocked or missing storage is tolerated. Without a key
+   * nothing is stored.
+   */
+  readonly rememberKey?: string | undefined;
+  /** Where `rememberKey` keeps the node id. Default: the browser's localStorage. */
+  readonly rememberStorage?: NodeStorage | undefined;
   /** Texts; missing ones come from `DEFAULT_TEXTS`. */
   readonly texts?: Partial<WheelTexts> | undefined;
 }

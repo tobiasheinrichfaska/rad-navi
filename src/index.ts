@@ -153,6 +153,9 @@ export {
   type StorageLike,
 } from './logic/shortcuts.ts';
 
+// Logic: remembered page
+export { loadLastNode, saveLastNode, type NodeStorage } from './logic/lastNode.ts';
+
 // Logic: mouse wheel
 export { DEAD_ZONE, PIXELS_PER_PAGE, turnAngle, wheelSteps } from './logic/scroll.ts';
 

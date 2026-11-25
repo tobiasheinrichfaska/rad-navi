@@ -52,7 +52,8 @@ import {
 } from './colors.ts';
 import { HubGears, GearsBehind, HubCopy, FADED } from './GearTrain.tsx';
 import { useHubGrab } from './useHubGrab.ts';
-import { useShortcuts } from './useShortcuts.ts';
+import { loadLastNode, saveLastNode } from '../logic/lastNode.ts';
+import { browserStorage, useShortcuts } from './useShortcuts.ts';
 import { useGrip, usePosition, useRingPath, useProgress, type GripWheel } from './position.ts';
 import { MiniWheel } from './MiniWheel.tsx';
 import { DEFAULT_TEXTS, type WheelNavProps } from './props.ts';
@@ -93,6 +94,8 @@ export function WheelNav({
   shortcuts: initialShortcuts,
   onShortcutsChange,
   shortcutsStorageKey,
+  rememberKey,
+  rememberStorage,
   texts: textOverrides,
 }: WheelNavProps) {
   const texts = useMemo(() => ({ ...DEFAULT_TEXTS, ...textOverrides }), [textOverrides]);
@@ -104,7 +107,11 @@ export function WheelNav({
   const gears = gearColors(dark, f.ground);
   // The page the app was on, so a restarted app opens there.
   const [startPage] = useState(() => {
-    const k = layoutOf(tree).pages.findIndex((s) => s.node.id === startNode);
+    const pageIds = layoutOf(tree).pages.map((s) => s.node.id);
+    const remembered = rememberKey
+      ? loadLastNode(rememberStorage ?? browserStorage(), rememberKey, (id) => pageIds.includes(id))
+      : undefined;
+    const k = pageIds.indexOf(startNode ?? remembered ?? '');
     return k >= 0 ? k : undefined;
   });
   // The first area stands whole at the pointer (the contact) on the start.
@@ -141,6 +148,10 @@ export function WheelNav({
   );
   const openNode = here.type === 'page' ? here.node.id : null;
   useEffect(() => onOpenChange?.(openNode), [openNode, onOpenChange]);
+  // Opt-in memory of the open page (the wheel, null, is not stored).
+  useEffect(() => {
+    if (rememberKey) saveLastNode(rememberStorage ?? browserStorage(), rememberKey, openNode);
+  }, [openNode, rememberKey, rememberStorage]);
   const area = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 390, h: 700 });
   useEffect(() => {
