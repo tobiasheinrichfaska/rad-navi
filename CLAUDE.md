@@ -54,12 +54,13 @@ Public entry: `src/index.ts`.
 | `src/logic/scroll.ts` | Mouse wheel → pages: `wheelSteps` (notch = one page, touchpad deltas add up), `turnAngle` (direction by the pointer's side, dead zone on the middle line) |
 | `src/logic/zones.ts` | `zoneAt`: every point of the wheel screen is exactly one zone (`hub` / `turn` / `piece` / `none`), fixed at pointer-down; `hubRadius`, `gesture` (tap slop 8 px, turn slop 2 px), `dropTarget`, `copyPoint` |
 | `src/logic/shortcuts.ts` | Hub shortcuts: `HubShortcuts`, `assign`, `clear`, `resolveShortcut`, versioned strict `serializeShortcuts`/`parseShortcuts`, storage wrapper `loadShortcuts`/`saveShortcuts` (takes a `StorageLike`), `fitLabel` |
+| `src/logic/lastNode.ts` | Opt-in memory of the open page: `loadLastNode(storage, key, isValid)` / `saveLastNode(storage, key, id)` (node id only, errors swallowed, `NodeStorage`); wired by `WheelNav` props `rememberKey` / `rememberStorage` (`startNode` wins; unknown id → first page) |
 | `src/logic/ring.ts`, `wheel.ts`, `gears.ts`, `picker.ts` | Layout of areas/pages on the wheels, geometry (arcs, settle, throw), gear train (ratio −1), choice wheel |
 | `src/ui/WheelNav.tsx`, `props.ts` | The navigation component and its props/texts (`WheelNavProps`, `WheelTexts`, `DEFAULT_TEXTS`) |
 | `src/ui/Ring.tsx`, `MiniWheel.tsx`, `GearTrain.tsx`, `Frame.tsx` | Wheel pieces, the small wheel on a page, gears, full-screen frame |
 | `src/ui/useHubGrab.ts`, `useShortcuts.ts` | Tap/grab of a hub gear (carried copy); shortcut state with `onShortcutsChange` and localStorage persistence (`browserStorage`) |
 | `src/ui/position.ts`, `colors.ts`, `wheelDrawing.ts`, `useBackGesture.ts`, `innerLevels.ts` | Pointer/position hooks, colours (light/dark, `NO_BOX`), drawing helpers, back gesture, inner levels |
-| `tests/logic/`, `tests/ui/` | Unit tests; guards (no tap boxes, light sheet), `renderToString` smoke tests, coupling guard (no app words, no foreign imports) |
+| `tests/logic/`, `tests/ui/` | Unit tests (`lastNode`, `remember-ui`); guards (no tap boxes, light sheet), `renderToString` smoke tests, coupling guard (no app words, no foreign imports) |
 | `package.json`, `tsconfig.json`, `vitest.config.ts`, `.prettierrc.json`, `.prettierignore` | Toolchain (`"private": true` against an accidental npm publish) |
 | `.gitattributes`, `.gitignore` | LF line endings; ignore rules |
 | `LICENSE`, `LICENSE_COMMERCIAL.md`, `CONTRIBUTING.md` | AGPLv3 + commercial |
@@ -76,7 +77,7 @@ no factory defaults.
 ```bash
 npm install
 npm run typecheck
-npm test            # 105 tests on 2026-11-24 (logic 73, ui 32)
+npm test            # 115 tests on 2026-11-25 (logic 77, ui 38)
 npm run format:check
 ```
 
@@ -127,4 +128,4 @@ first pixels and fired a tap action on small turns is gone), pieces tap (8 px) o
   `keyboardFocus` is exported but unused; `Placeholder`'s back button can never show.
 - The coupling guard forbids app words in `src/`.
 
-*Last updated: 2026-11-24*
+*Last updated: 2026-11-25 (opt-in `rememberKey`)*

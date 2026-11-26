@@ -39,6 +39,12 @@ the other hub gear to point it to the page at the contact, onto the small idler 
 `shortcuts` / `onShortcutsChange` and store them yourself). A hub that has a jump target or extra
 action keeps doing that on a tap (assign by drag or Shift+Enter).
 
+**Letzte Seite merken (optional):** `rememberKey="meine-app-seite"` übergeben, dann merkt sich das
+Paket die zuletzt offene Seite (nur deren Knoten-ID) im localStorage und öffnet beim nächsten Start
+dort, sofern die Seite im Baum noch existiert, sonst auf der ersten. `startNode` hat Vorrang;
+`rememberStorage` ersetzt localStorage. Blockierter Speicher wird still toleriert; ohne Schlüssel wird
+nichts gespeichert. Ohne UI: `loadLastNode` / `saveLastNode`.
+
 All props and texts: `src/ui/props.ts`. Names of the original German API and their English
 equivalents: [docs/api-mapping.md](docs/api-mapping.md). Gestures and look can only be checked on a
 device: see `manual_tests/`.
