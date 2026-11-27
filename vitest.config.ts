@@ -6,5 +6,6 @@ export default defineConfig({
     environment: 'node',
     pool: 'forks',
     globals: true,
+    testTimeout: 60000, // the zone grids are exhaustive and take up to ~15 s on a slow machine
   },
 });
