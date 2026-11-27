@@ -29,14 +29,20 @@ export function loadLastNode(
   }
 }
 
-/** Stores the node id; the wheel (null) and an empty id are ignored. False when nothing was stored. */
+/**
+ * Stores the node id; the wheel (null), an empty id and, with `isValid`, an id it does not accept
+ * (one the start could not open again, so the stored one stays) are ignored. False when nothing was
+ * stored; a throwing `isValid` stores nothing.
+ */
 export function saveLastNode(
   storage: NodeStorage | undefined,
   key: string,
   nodeId: string | null,
+  isValid?: (nodeId: string) => boolean,
 ): boolean {
   if (!storage || !nodeId) return false;
   try {
+    if (isValid && !isValid(nodeId)) return false;
     storage.setItem(key, nodeId);
     return true;
   } catch {

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -106,13 +107,17 @@ export function WheelNav({
   const f = surfaces(dark);
   const gears = gearColors(dark, f.ground);
   // The page the app was on, so a restarted app opens there.
+  // Only a page of the top ring can be opened at the start: the same check for loading and saving.
+  const startPageIds = useMemo(() => layoutOf(tree).pages.map((s) => s.node.id), [tree]);
+  const isStartPage = useCallback((id: string) => startPageIds.includes(id), [startPageIds]);
   const [startPage] = useState(() => {
-    const pageIds = layoutOf(tree).pages.map((s) => s.node.id);
     const remembered = rememberKey
-      ? loadLastNode(rememberStorage ?? browserStorage(), rememberKey, (id) => pageIds.includes(id))
+      ? loadLastNode(rememberStorage ?? browserStorage(), rememberKey, isStartPage)
       : undefined;
-    const k = pageIds.indexOf(startNode ?? remembered ?? '');
-    return k >= 0 ? k : undefined;
+    // a startNode the tree no longer has does not block the remembered page
+    const k = startNode === undefined ? -1 : startPageIds.indexOf(startNode);
+    const r = k >= 0 || remembered === undefined ? k : startPageIds.indexOf(remembered);
+    return r >= 0 ? r : undefined;
   });
   // The first area stands whole at the pointer (the contact) on the start.
   const position = usePosition(
@@ -150,8 +155,10 @@ export function WheelNav({
   useEffect(() => onOpenChange?.(openNode), [openNode, onOpenChange]);
   // Opt-in memory of the open page (the wheel, null, is not stored).
   useEffect(() => {
-    if (rememberKey) saveLastNode(rememberStorage ?? browserStorage(), rememberKey, openNode);
-  }, [openNode, rememberKey, rememberStorage]);
+    // a page of an inner ring is not stored: the start could not open it (the last top page stays)
+    if (rememberKey)
+      saveLastNode(rememberStorage ?? browserStorage(), rememberKey, openNode, isStartPage);
+  }, [openNode, rememberKey, rememberStorage, isStartPage]);
   const area = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 390, h: 700 });
   useEffect(() => {
