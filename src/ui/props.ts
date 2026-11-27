@@ -101,7 +101,7 @@ export interface WheelNavProps {
   /**
    * Opt-in: with a key the package remembers the page that was open (only its node id) in
    * localStorage and opens there on the next start if the page still exists in the tree, else on the
-   * first page. `startNode` wins over it. Blocked or missing storage is tolerated. Without a key
+   * first page. `startNode` wins over it when the tree has it. Only pages of the top ring are stored. Blocked or missing storage is tolerated. Without a key
    * nothing is stored.
    */
   readonly rememberKey?: string | undefined;

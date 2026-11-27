@@ -54,4 +54,16 @@ describe('remembered page', () => {
       }),
     ).toBeUndefined();
   });
+
+  it('saving with a check stores only an id the start can open again', () => {
+    const { map, storage } = memory();
+    expect(saveLastNode(storage, 'k', 'two/beta', known)).toBe(true);
+    expect(saveLastNode(storage, 'k', 'inner/page', known)).toBe(false);
+    expect(map.get('k')).toBe('two/beta'); // the last page that can be reopened stays
+    expect(
+      saveLastNode(storage, 'k', 'one/alpha', () => {
+        throw new Error('bad validator');
+      }),
+    ).toBe(false);
+  });
 });

@@ -57,6 +57,18 @@ describe('WheelNav rememberKey', () => {
     expect(html).toContain('real beta');
   });
 
+  it('a startNode the tree no longer has does not block the remembered page', () => {
+    const { storage } = spy({ last: 'two/gamma' });
+    const html = render({ rememberKey: 'last', rememberStorage: storage, startNode: 'gone/page' });
+    expect(html).toContain('real gamma');
+  });
+
+  it('source: loading and saving use the same check of the start pages', () => {
+    const text = readFileSync(new URL('../../src/ui/WheelNav.tsx', import.meta.url), 'utf8');
+    expect(text).toMatch(/loadLastNode\([^;]*, isStartPage\)/);
+    expect(text).toMatch(/saveLastNode\([^;]*, openNode, isStartPage\)/);
+  });
+
   it('without the key the storage is never touched', () => {
     const { calls, storage } = spy({ last: 'two/gamma' });
     const html = render({ rememberStorage: storage });
@@ -66,6 +78,6 @@ describe('WheelNav rememberKey', () => {
 
   it('source: saving happens only under the key, through saveLastNode', () => {
     const text = readFileSync(new URL('../../src/ui/WheelNav.tsx', import.meta.url), 'utf8');
-    expect(text).toMatch(/if \(rememberKey\) saveLastNode\(/);
+    expect(text).toMatch(/if \(rememberKey\)\s+saveLastNode\(/);
   });
 });
